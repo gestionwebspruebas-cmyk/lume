@@ -1,0 +1,582 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, 
+maximum-scale=1.0, user-scalable=no" />
+  <meta name="theme-color" content="#0f172a" />
+  <title>LUMES</title>
+  <link rel="icon" type="image/x-icon" href="chama1.png">
+
+  <!-- Leaflet CSS -->
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+    crossorigin=""
+  />
+
+  <style>
+    /* ---------- CSS Reset & Base ---------- */
+    *,
+    *::before,
+    *::after { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; height: 100%; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen,
+        Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
+      background: #0f172a;
+      color: #0f172a;
+      -webkit-font-smoothing: antialiased;
+      overflow: hidden;
+    }
+
+    /* ---------- Layout ---------- */
+    .app {
+      position: relative;
+      width: 100%;
+      height: 100dvh;
+      height: 100vh; /* fallback */
+    }
+
+    #map {
+      position: absolute;
+      inset: 0;
+      z-index: 1;
+    }
+
+    /* ---------- Top Header ---------- */
+    .topbar {
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      z-index: 1000;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 14px;
+      background: linear-gradient(180deg, rgba(15,23,42,0.85), 
+rgba(15,23,42,0));
+      pointer-events: none;
+    }
+    .topbar > * { pointer-events: auto; }
+    .brand {
+      display: flex; align-items: center; gap: 8px;
+      color: #01060c;
+      font-weight: 700;
+      letter-spacing: 0.2px;
+    }
+    .brand .dot {
+      width: 10px; height: 10px; border-radius: 50%;
+      background: #22c55e; box-shadow: 0 0 0 4px rgba(34,197,94,0.25);
+    }
+    .count-badge {
+      background: rgba(255,255,255,0.12);
+      color: #f8fafc;
+      border: 1px solid rgba(255,255,255,0.15);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      font-size: 13px;
+      padding: 6px 10px;
+      border-radius: 999px;
+    }
+    .count-badge b { color: #22c55e; }
+
+    /* ---------- Floating Control Buttons (top-right) ---------- */
+    .controls {
+      position: absolute;
+      top: 70px; right: 14px;
+      z-index: 1000;
+      display: flex; flex-direction: column; gap: 10px;
+    }
+    .btn {
+      width: 44px; height: 44px;
+      display: grid; place-items: center;
+       background: linear-gradient(120deg, rgba(15,23,42,0.85), 
+rgba(15,23,42,0));
+      border: 1px solid black;
+      border-radius: 12px;
+      box-shadow: 0 6px 18px rgba(0,0,0,0.18);
+      cursor: pointer;
+      transition: transform 0.12s ease, background 0.12s ease;
+      color: #0f172a;
+    }
+    .btn:hover { transform: translateY(-1px); border: 2px inset white;}
+    .btn:active { transform: translateY(0) scale(0.97); }
+    .btn.primary { background: #2563eb; color: #fff; }
+    .btn.primary:hover { background: #1d4ed8; }
+    .btn svg { width: 22px; height: 22px; }
+
+    /* ---------- Bottom Action Bar (mobile-first) ---------- */
+    .actionbar {
+      position: absolute;
+      
+      left: 14px; right: 14px; bottom: 18px;
+      z-index: 1000;
+      display: flex; 
+      
+      left: 50%;
+      transform: translate(-50%,0);
+      gap: 10px;
+      
+    }
+    .action {
+      flex: 1;
+      display: flex;  
+      justify-content: center; 
+      text-align: center;
+      gap: 8px;
+      padding: 14px 16px;
+      border-radius: 14px;
+      border: 1px solid black;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      box-shadow: 0 10px 24px rgba(0,0,0,0.25);
+      transition: transform 0.12s ease, filter 0.12s ease;
+    }
+    .action:active { transform: scale(0.98); }
+    .action.add { background: #22c55e; color: #052e16; }
+    .action.add:hover { filter: brightness(1.05); }
+    .action.clear { background: #fee2e2; color: #7f1d1d; flex: 0 0 auto; padding: 14px 18px; }
+    .action.clear:hover { background: #fecaca; }
+    .action svg { width: 20px; height: 20px; }
+    .action.add.active { background: #f59e0b; color: #1f2937; }
+
+    /* ---------- Popup Styling ---------- */
+    .leaflet-popup-content-wrapper {
+      border-radius: 12px;
+      box-shadow: 0 10px 24px rgba(0,0,0,0.18);
+      background: linear-gradient(120deg, rgba(247, 247, 248, 0.85), rgba(15,23,42,0));
+      border: 1px solid black;
+      border-radius: 12px;
+      box-shadow: 0 6px 18px rgba(0,0,0,0.18);
+      cursor: pointer;
+      transition: transform 0.12s ease, background 0.12s ease;
+      color: #d4d5daee;
+    }
+
+    .leaflet-popup-content { margin: 12px 14px;  }
+    .popup-title { font-weight: 700; margin: 0 0 4px; font-size: 14px; color: #0f172a; }
+    .popup-coords { font-size: 12px; color: #475569; margin: 0 0 8px; font-family: ui-monospace, monospace; }
+    .popup-actions { display: flex; gap: 6px; margin-top: 8px; }
+    .popup-btn {
+      flex: 1; padding: 6px 8px; font-size: 12px; font-weight: 600;
+      border: none; border-radius: 8px; cursor: pointer;
+    }
+    .popup-btn.del { background: #fee2e2; color: #7f1d1d; }
+    .popup-btn.del:hover { background: #fecaca; }
+
+    /* ---------- Toast ---------- */
+    .toast {
+      position: fixed;
+      top: 70px; left: 50%;
+      transform: translateX(-50%) translateY(-20px);
+      background: #0f172a;
+      color: #f8fafc;
+      padding: 10px 16px;
+      border-radius: 10px;
+      font-size: 14px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s ease, transform 0.2s ease;
+      z-index: 2000;
+      max-width: 90%;
+      text-align: center;
+    }
+    .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+    /* ---------- Desktop tweaks ---------- */
+    @media (min-width: 768px) {
+      .topbar { padding: 16px 22px; }
+      /*.controls { top: 80px; right: 22px; }*/
+      .actionbar { left: auto; right: 22px; bottom: 22px; width: 420px; }
+      .brand { font-size: 16px; }
+    }
+
+    /* Hide Leaflet attribution flag clutter on small screens */
+    .leaflet-control-attribution { font-size: 10px; }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <div id="map" role="application" aria-label="Interactive map"></div>
+
+    <!-- Top Bar -->
+    <header class="topbar">
+      <div class="brand">
+        <span class="dot"></span>
+        <span>Datos Lumes</span>
+      </div>
+      <div class="count-badge" id="countBadge">
+        <b id="markerCount">0</b> Marcadores
+      </div>
+    </header>
+
+    <!-- Floating Controls -->
+    <div class="controls">
+      <button class="btn" id="locateBtn" title="A miña posición" aria-label="A miña posición.">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="3"></circle>
+          <path d="M12 2v3M12 19v3M2 12h3M19 12h3"></path>
+        </svg>
+      </button>
+      <button class="btn" id="zoomInBtn" title="+ Zoom" aria-label="+ Zoom">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="12" y1="5" x2="12" y2="19"></line>
+          <line x1="5" y1="12" x2="19" y2="12"></line>
+        </svg>
+      </button>
+      <button class="btn" id="zoomOutBtn" title="+ Zoom" aria-label="- Zoom">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="5" y1="12" x2="19" y2="12"></line>
+        </svg>
+      </button>
+       <button class="btn" id="capasBtn" title="Capas" aria-label="Capas">
+        <svg width="28" height="28" viewBox="0 0 22 21" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <path  fill-rule="evenodd" 
+        clip-rule="evenodd" d="M2.893 13.947L1.966 14.494L11 19.838L20.033 14.496L19.106 13.949L20.089 13.367L22 14.495L11 21L0 14.493L1.91 13.365L2.893 13.947ZM22 6.495L11 13L0 6.493L11 0L22 6.495ZM11.001 11.838L20.034 6.496L11.001 1.161L1.966 6.494L11.001 11.838ZM20.09 9.368L19.107 9.948L20.034 10.496L11.001 15.838L1.966 10.494L2.893 9.947L1.91 9.365L0 10.493L11 17L22 10.495L20.09 9.368Z" 
+        fill="currentColor" stroke="currentColor" stroke-width="0.8" stroke-linejoin="round"/>
+      </svg>
+      </button>
+      <button class="btn" id="mapasBtn" title="Tipo Mapa" aria-label="Tipo Mapa">
+      <svg width="28" height="28" viewBox="0 0 22 22" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <path fill-rule="evenodd" clip-rule="evenodd" 
+      d="M22 12H12V22H22V12ZM13 21V16H18V18H16V19H18V21H13ZM21 21H19V16H21V21ZM21 15H13V13H21V15ZM10 0H0V10H10V0ZM9.481 7.085L9.381 7.077C9.248 7.067 9.129 7.038 9 7.021V9H4.956C4.975 9.067 4.999 9.13 5.014 9.2H3.981C3.958 9.129 3.919 9.069 3.892 9H1V6.266C0.964245 6.2501 0.928241 6.23476 0.892 6.22L0.799 6.185L0.633 5.056L1 5.194V1H3.053C3.01752 0.86029 2.98617 0.719562 2.959 0.578L2.943 0.478L3.932 0.323L3.947 0.423C3.954 0.463 3.989 0.677 4.073 1H9V6.014C9.152 6.038 9.299 6.068 9.46 6.081L9.56 6.089L9.481 7.085ZM9.46 6.081L9.56 6.089L9.481 7.085L9.381 7.077C9.248 7.067 9.129 7.038 9 7.021C4.759 6.455 3.385 2.332 3.053 1C3.01752 0.86029 2.98617 0.719562 2.959 0.578L2.943 0.478L3.932 0.323L3.947 0.423C3.954 0.463 3.989 0.677 4.073 1C4.42 2.328 5.603 5.488 9 6.014C9.152 6.038 9.299 6.068 9.46 6.081ZM4.956 9C4.975 9.067 4.999 9.13 5.014 9.2H3.981C3.958 9.129 3.919 9.069 3.892 9C3.29119 7.7683 2.26348 6.79673 1 6.266C0.964245 6.2501 0.928241 6.23476 0.892 6.22L0.799 6.185L0.633 5.056L1.244 5.285C1.384 5.337 4.239 6.453 4.956 9ZM22 8V0H12V10H22V8ZM21 1V7H17V6H19V4H20V1H21ZM18 4V5H13V3H16V4H18ZM19 1V3H17V1H19ZM13 1H16V2H13V1ZM13 9V6H16V8H21V9H13ZM0 22H10V12H0V22ZM1 21V19.386C1.45629 19.3323 1.90022 19.2017 2.313 19C2.65981 18.6058 2.87023 18.1103 2.913 17.587C3.038 16.367 3.273 15.992 4.563 16.001C5.30363 15.9713 5.99861 16.3585 6.363 17.004C7.373 17.883 7.915 18.286 8.655 18.052C8.76839 18.0188 8.88358 17.9921 9 17.972V21H1ZM9 13V16.937C8.78278 16.9828 8.5673 17.0365 8.354 17.098C7.853 17.257 7.589 16.851 6.826 16.108C6.29573 15.42 5.47046 15.0244 4.602 15.042C3.67359 14.923 2.75502 15.3246 2.212 16.087C1.906 16.54 2.222 17.335 1.712 18.125C1.50073 18.2622 1.25161 18.3294 1 18.317V13H9Z" 
+      fill="currentColor" stroke="currentColor" stroke-width="0.6" stroke-linejoin="round"/>
+      </svg>
+      </button>
+      <button class="btn" id="marcadorBtn" title="Engadir Marcador" aria-label="Engadir Marcador">
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <!-- Marcador de mapa -->
+     <path  d="M12 2C8.13 2 5 5.13 5 9C5 13.5 12 22 12 22C12 22 19 13.5 19 9C19 5.13 15.87 2 12 2Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+     <!-- Centro del marcador -->
+     <circle cx="12" cy="9" r="3" fill="currentColor"/>
+     <!-- Signo + -->
+     <path d="M12 6V12M9 9H15" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+     </svg>
+    </button>
+    <button class="btn" id="elimiBtn" title="Eliminar Marcador" aria-label="Eliminar Marcador">
+    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+    <!-- Papelera -->
+    <path 
+    d="M3 6H21M19 6V18C19 19.1 18.1 20 17 20H7C5.9 20 5 19.1 5 18V6M8 6V4C8 3.44772 8.44772 3 9 3H15C15.5523 3 16 3.44772 16 4V6" 
+    stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Líneas interiores -->
+    <path d="M10 11V16M14 11V16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+    </svg>
+    </button>
+  </div>
+
+    <!-- Bottom Action Bar -->
+    <div class="actionbar">
+      <button class="action add" id="addModeBtn" title="Pulsar para engadir un marcador">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" 
+           stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 1 1 18 0z"></path>
+          <line x1="12" y1="8" x2="12" y2="14"></line>
+          <line x1="9" y1="11" x2="15" y2="11"></line>
+        </svg>
+        <span id="addModeLabel">Marcardor</span>
+      </button>
+      <button class="action clear" id="clearBtn" title="Remove all 
+markers">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" 
+stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="3 6 5 6 21 6"></polyline>
+          <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path>
+        </svg>
+      </button>
+    </div>
+
+    <div class="toast" id="toast"></div>
+  </div>
+
+  <!-- Leaflet JS -->
+  <script
+    src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+    crossorigin=""
+  ></script>
+
+  <script>
+  var current = '';
+    //-----------------Datos metereolóxicos  -------------
+async function getCurrentWeather(lat, lon){
+  const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,wind_speed_10m,wind_direction_10m,wind_gusts_10m&timezone=auto`;
+  console.log(url);
+  try {
+    const response = await fetch(url);
+    
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+
+    const data = await response.json();
+
+    if (!data?.current) {
+      console.error("Respuesta inválida:", data);
+      return null;
+    }
+
+    current = {
+      temperature: data.current.temperature_2m,
+      humidity: data.current.relative_humidity_2m,
+      feelsLike: data.current.apparent_temperature,
+      precipitation: data.current.precipitation ?? 0,
+      windSpeed: data.current.wind_speed_10m ?? 0,
+      windDirection: data.current.wind_direction_10m ?? 0,
+      windGusts: data.current.wind_gusts_10m ?? 0,
+      elevation: data.elevation ?? null,
+      time: data.current.time
+    };
+
+    console.log("✅ Clima actual:", current);
+    return current;
+
+  } catch (error) {
+    console.error("❌ Error al obtener datos meteorológicos:", error);
+    return null;
+  }
+}
+    // ---------- State ----------
+    const state = {
+      addMode: false,
+      markers: [],          // { id, latlng, marker, name }
+      userMarker: null,
+      userAccuracy: null,
+      nextId: 1,
+    };
+
+    // ---------- Map Setup ----------
+    const map = L.map('map', {
+      zoomControl: false,           // we use custom buttons
+      attributionControl: true,
+    }).setView([42.908, -7.702],8);
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+    }).addTo(map);
+
+    // Ensure the map recalculates its size when the layout changes (mobile rotation, etc.)
+    setTimeout(() => map.invalidateSize(), 200);
+    window.addEventListener('resize', () => map.invalidateSize());
+
+    // ---------- Custom marker icon ----------
+    const customIcon = L.icon({
+      iconUrl:
+        'data:image/svg+xml;utf8,' +
+        encodeURIComponent(`
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 44" width="32" height="44">
+            <defs>
+              <filter id="s" x="-20%" y="-10%" width="140%" height="140%">
+                <feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="#000" flood-opacity="0.35"/>
+              </filter>
+            </defs>
+            <path filter="url(#s)" d="M16 1C8.3 1 2 7.3 2 15c0 9.5 12.5 26.5 13 27 .4.4 1.6.4 2 0 .5-.5 13-17.5 13-27C30 7.3 23.7 1 16 1z" fill="#2563eb"/>
+            <circle cx="16" cy="15" r="6" fill="#ffffff"/>
+          </svg>
+        `),
+      iconSize: [32, 44],
+      iconAnchor: [16, 42],
+      popupAnchor: [0, -38],
+    });
+
+    // ---------- User location marker icon ----------
+    const userIcon = L.icon({
+      iconUrl:
+        'data:image/svg+xml;utf8,' +
+        encodeURIComponent(`
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24">
+            <circle cx="12" cy="12" r="6" fill="#22c55e" stroke="#ffffff" stroke-width="3"/>
+          </svg>
+        `),
+      iconSize: [24, 24],
+      iconAnchor: [12, 12],
+    });
+
+    // ---------- DOM refs ----------
+    const $ = (id) => document.getElementById(id);
+    const addModeBtn = $('addModeBtn');
+    const marcadorBtn = $('marcadorBtn');
+    const elimiBtn = $('elimiBtn');
+    const addModeLabel = $('addModeLabel');
+    const clearBtn = $('clearBtn');
+    const locateBtn = $('locateBtn');
+    const zoomInBtn = $('zoomInBtn');
+    const zoomOutBtn = $('zoomOutBtn');
+    const markerCountEl = $('markerCount');
+    const toastEl = $('toast');
+
+    // ---------- Toast ----------
+    let toastTimer;
+    function toast(msg) {
+      toastEl.textContent = msg;
+      toastEl.classList.add('show');
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => toastEl.classList.remove('show'), 2400);
+    }
+
+    // ---------- Counter ----------
+    function updateCount() {
+      markerCountEl.textContent = state.markers.length;
+    }
+
+    // ---------- Format coords ----------
+    function fmt(n) { return n.toFixed(5); }
+
+    // ---------- Add a marker ----------
+    function addMarker(latlng, name){
+      const id = state.nextId++;
+      const m = L.marker(latlng, { icon: customIcon, draggable: false }).addTo(map);
+      getCurrentWeather(latlng.lat, latlng.lng);
+      //alert('hola: '+current.temperature);
+      const popupHtml = `
+        <div>
+          <p class="popup-title">${escapeHtml(name)}</p>
+          <p class="popup-coords">Lon: ${fmt(latlng.lat)}, Lat: ${fmt(latlng.lng)}</p>
+          <p class="popup-coords">Altura: ${current.elevation} m</p>
+          <p class="popup-coords">Temperatura: ${current.temperature} ºC</p>
+          <p class="popup-coords">Humidade: ${current.humidity} %</p>
+          <p class="popup-coords">V. Vento: ${current.windSpeed} m/s</p>
+          <p class="popup-coords">D. Vento: ${current.windDirection} ºC</p>
+          <div class="popup-actions">
+            <button class="popup-btn del" data-action="delete" data-id="${id}">Borrar</button>
+          </div>
+        </div>
+      `;
+      
+      m.bindPopup(popupHtml);
+      m.on('popupopen', (e) => {
+        const btn = e.popup.getElement().querySelector('[data-action="delete"]');
+        if (btn) btn.addEventListener('click', () => removeMarker(id));
+      });
+      m.on('dragend', (e) => {
+        const newLatLng = e.target.getLatLng();ç
+        alert('movome');
+        const item = state.markers.find(x => x.id === id);
+        if (item) item.latlng = newLatLng;
+      });
+
+      const item = { id, latlng, marker: m, name };
+      state.markers.push(item);
+      updateCount();
+      return item;
+    }
+
+    function escapeHtml(s) {
+      return String(s).replace(/[&<>"']/g, c => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]));
+    }
+
+    function removeMarker(id) {
+      const idx = state.markers.findIndex(x => x.id === id);
+      if (idx === -1) return;
+      map.removeLayer(state.markers[idx].marker);
+      state.markers.splice(idx, 1);
+      updateCount();
+    }
+
+    function clearAllMarkers() {
+      if (state.markers.length === 0) return;
+      state.markers.forEach(m => map.removeLayer(m.marker));
+      state.markers = [];
+      updateCount();
+      toast('Todos os marcadores eliminados !');
+    }
+
+    // ---------- Add mode toggle ----------
+    function setAddMode(on) {
+      state.addMode = on;
+      addModeBtn.classList.toggle('active', on);
+      addModeLabel.textContent = on ? 'Pulsa no mapa' : '+ Marcador';
+      map.getContainer().style.cursor = on ? 'crosshair' : '';
+    }
+
+    addModeBtn.addEventListener('click', () => setAddMode(!state.addMode));
+    marcadorBtn.addEventListener('click', () => setAddMode(!state.addMode));
+    clearBtn.addEventListener('click', clearAllMarkers);
+    elimiBtn.addEventListener('click', clearAllMarkers);
+    // Click to add marker (only when add mode is on)
+    map.on('click', (e) => {
+      if (!state.addMode) return;
+      const name = `Punto_${state.markers.length + 1}`;
+      const item = addMarker(e.latlng, name);
+      item.marker.openPopup();
+      setAddMode(false);
+      toast('Marcador engadido');
+    });
+
+    // ---------- Zoom buttons ----------
+    zoomInBtn.addEventListener('click', () => map.zoomIn());
+    zoomOutBtn.addEventListener('click', () => map.zoomOut());
+
+    // ---------- Locate me ----------
+    function locateUser() {
+      if (!('geolocation' in navigator)) {
+        toast('Xeolocalización non soportada');
+        return;
+      }
+      toast('Locating…');
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          const { latitude, longitude, accuracy } = pos.coords;
+          const latlng = [latitude, longitude];
+
+          if (state.userMarker) map.removeLayer(state.userMarker);
+          if (state.userAccuracy) map.removeLayer(state.userAccuracy);
+
+          state.userAccuracy = L.circle(latlng, {
+            radius: accuracy,
+            color: '#22c55e',
+            fillColor: '#22c55e',
+            fillOpacity: 0.15,
+            weight: 1.5,
+          }).addTo(map);
+
+          state.userMarker = L.marker(latlng, { icon: userIcon })
+            .addTo(map)
+            .bindPopup(`<b>You are here</b><br><span class="popup-coords">${fmt(latitude)}, ${fmt(longitude)}</span><br>±${Math.round(accuracy)} m`)
+            .openPopup();
+
+          map.flyTo(latlng, 15, { duration: 1.2 });
+          toast('Location found');
+        },
+        (err) => {
+          const msg = err.code === 1 ? 'Permission denied' :
+                      err.code === 2 ? 'Position unavailable' :
+                      'Location request timed out';
+          toast(msg);
+        },
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
+      );
+    }
+    locateBtn.addEventListener('click', locateUser);
+    
+    // ---------- Init ----------
+    updateCount();
+
+    // Try to locate on load (non-blocking, silent if denied)
+    if ('geolocation' in navigator) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          const { latitude, longitude } = pos.coords;
+          map.flyTo([latitude, longitude], 13, { duration: 1.2 });
+          state.userMarker = L.marker([latitude, longitude], { icon: userIcon })
+            .addTo(map)
+            .bindPopup('You are here');
+            state.userAccuracy = L.circle([latitude, longitude], {
+            radius: pos.coords.accuracy, color: '#22c55e',
+            fillColor: '#22c55e', fillOpacity: 0.15, weight: 1.5
+          }).addTo(map);
+        },
+        () => { /* user denied - no-op, map stays at default view */ },
+        { enableHighAccuracy: false, timeout: 8000, maximumAge: 60000 }
+      );
+    }
+
+    
+  </script>
+</body>
+</html>
